@@ -1,6 +1,9 @@
 import mather.ops as ops
 
 class Exp:
+    def __init__(self, *args):
+        raise NotImplementedError('Do not instantiate Exp! Use a subclass instead')
+
     def __repr__(self):
         return ''
 
@@ -44,6 +47,12 @@ class ConstExp(Exp):
     def __repr__(self):
         return str(self.value)
 
+    def __eq__(self, other):
+        if isinstance(other, ConstExp):
+            return self.value == other.value
+        else:
+            return self is other or self.value == other
+
     def evaluate(self, **kwargs):
         return self.value
 
@@ -53,6 +62,12 @@ class VarExp(Exp):
 
     def __repr__(self):
         return self.name
+
+    def __eq__(self, other):
+        if isinstance(other, VarExp):
+            return self.name == other.name
+        else:
+            return False
 
     def __add__(self, other):
         if isinstance(other, Exp):
@@ -143,6 +158,17 @@ class OpExp(Exp):
                 formattedlist.append(temp)
         return self.op.fmt.format(*formattedlist)
 
+    def __eq__(self, other):
+        if isinstance(other, OpExp):
+            if self.op != other.op or len(self.args) != len(other.args):
+                return False
+            for i, j in zip(self.args, other.args):
+                if i != j:
+                    return False
+            return True
+        else:
+            return False
+
     def evaluate(self, **kwargs):
         return self.op.apply(*(e.evaluate(**kwargs) for e in self.args))
         
@@ -163,7 +189,7 @@ def degree(exp):
     elif isinstance(exp, VarExp):
         return 1
     else:
-        return 2
+        return 2 # TODO
     # degree is determined by this formula: deg(e) = 0 if e is a ConstExp, 1 if e is a VarExp, sum(deg(a[i]) for i in e.args) if e is a * OpExp, 
 
 def convert_to_sum(exp):
@@ -192,6 +218,58 @@ def sort_sum(exp):
     exp.args.sort(key=degree, reverse=True)
     return exp
 
+def common_factor(e1, e2):
+    # this function does not factor out constants
+    exp1 = convert_to_mult(e1)
+    exp2 = convert_to_mult(e2)
+    if isinstance(exp1, VarExp):
+        if isinstance(exp2, VarExp):
+            if exp1.name == exp2.name:
+                return (exp1, (ConstExp(1), ConstExp(1)))
+            else:
+                return (ConstExp(1), (exp1, exp2))
+        elif isinstance(exp2, OpExp):
+            index = next(filter(lambda ij: ij[1].name == exp1.name, enumerate(exp2.args)), (-1, None))[0]
+            if index == -1:
+                return (ConstExp(1), (exp1, exp2))
+            else:
+                del exp2.args[index]
+                return (exp1, (ConstExp(1), exp2))
+    elif isinstance(exp1, OpExp):
+        if isinstance(exp2, VarExp):
+            index = next(filter(lambda ij: ij[1].name == exp2.name, enumerate(exp1.args)), (-1, None))[0]
+            if index == -1:
+                return (ConstExp(1), (exp1, exp2))
+            else:
+                del exp1.args[index]
+                return (exp2, (exp1, ConstExp(1)))
+        elif isinstance(exp2, OpExp):
+            i = 0
+            result = []
+            while i < len(exp1.args):
+                index = next(filter(lambda ij: ij[1] == exp1.args[i], enumerate(exp2.args)), (-1, None))[0] # finds the index of the first occurrence of exp1[i] in exp2
+                if index == -1:
+                    i += 1
+                else:
+                    result.append(exp1.args[i])
+                    del exp1.args[i]
+                    del exp2.args[index]
+            if len(exp1.args) == 0:
+                exp1 = ConstExp(1)
+            elif len(exp1.args) == 1:
+                exp1 = exp1.args[0]
+            if len(exp2.args) == 0:
+                exp2 = ConstExp(1)
+            elif len(exp2.args) == 1:
+                exp2 = exp2.args[0]
+            if len(result) == 0:
+                return (ConstExp(1), (exp1, exp2))
+            elif len(result) == 1:
+                return (result[0], (exp1, exp2))
+            else:
+                return (OpExp(ops.multiply, *result), (exp1, exp2))
+    return (ConstExp(1), (exp1, exp2))
+
 def convert_to_mult(exp):
     def ismultiply(e):
         return isinstance(e, OpExp) and e.op == ops.multiply
@@ -209,8 +287,7 @@ def convert_to_mult(exp):
             else:
                 arglist.append(a2)
             return OpExp(ops.multiply, *arglist)
-    else:
-        return exp
+    return exp
 
 def rebalance(exp):
     pass

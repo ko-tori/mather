@@ -14,6 +14,10 @@ test = OpExp(ops.multiply, 1,2,3,x)
 #print(test.evaluate(x=4))
 
 a=convert_to_sum(1+x+1+2)
-print(a)
+#print(a)
 sort_sum(a)
-print(a)
+#print(a)
+
+e1 = x*y*z
+e2 = z*y*x**2*b
+print(common_factor(e1, e2))

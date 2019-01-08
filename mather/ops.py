@@ -1,3 +1,5 @@
+from functools import reduce
+
 # 'commutative' means the order of the arguments does not matter.
 # 'nogroup' means the operation does not require parentheses when performed before another operation with higher precedence.
 # 'nongroupingargs' is a list of which arguments do not need to be grouped, e.g the arguments of max(a, b) would have a list [True, True] or just the value True to signify all arguments are nongrouping.
@@ -43,7 +45,7 @@ add = Op('+', '{}+{}', 2, lambda x, y: x + y, 0, Properties({
 }))
 sub = Op('-', '{}-{}', 2, lambda x, y: x - y, 0)
 
-summate = Op('+', type('summate_fmt_ty', (object,), { 'format': lambda *x: '+'.join(x[1:]) })(), lambda x: x > 0, lambda *x: sum(x), 0)
+summate = Op('sum', type('summate_fmt_ty', (object,), { 'format': lambda *x: '+'.join(x[1:]) })(), lambda x: x > 0, lambda *x: sum(x), 0)
 
 # precedence 1
 neg = Op('-', '-{}', 1, lambda x: -x, 1)
@@ -53,6 +55,8 @@ mul = Op('*', '{}*{}', 2, lambda x, y: x * y, 1, Properties({
     'associative': True
 }))
 div = Op('/', '{}/{}', 2, lambda x, y: x / y, 1)
+
+multiply = Op('*', type('multiply_fmt_ty', (object,), { 'format': lambda *x: '*'.join(x[1:]) })(), lambda x: x > 0, lambda *x: reduce(lambda a, b: a * b, x), 0)
 
 # precedence 2
 pow = Op('**', '{}**{}', 2, lambda x, y: x ** y, 2, Properties({

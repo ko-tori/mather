@@ -44,6 +44,9 @@ class ConstExp(Exp):
     def __repr__(self):
         return str(self.value)
 
+    def evaluate(self, **kwargs):
+        return self.value
+
 class VarExp(Exp):
     def __init__(self, name):
         self.name = name
@@ -110,11 +113,17 @@ class VarExp(Exp):
             return OpExp(ops.pow, other, self)
         else:
             return OpExp(ops.pow, ConstExp(other), self)
+
+    def evaluate(self, **kwargs):
+        if self.name not in kwargs:
+            return self
+        else:
+            return kwargs[self.name]
         
 class OpExp(Exp):
     def __init__(self, op, *args):
         self.op = op
-        self.args = list(args)
+        self.args = [arg if isinstance(arg, Exp) else ConstExp(arg) for arg in args]
         if not op.nargs(len(args)):
             raise TypeError ('Invalid number of arguments for ' + op.symbol)
 
@@ -133,8 +142,83 @@ class OpExp(Exp):
             else:
                 formattedlist.append(temp)
         return self.op.fmt.format(*formattedlist)
+
+    def evaluate(self, **kwargs):
+        return self.op.apply(*(e.evaluate(**kwargs) for e in self.args))
         
 Var = VarExp
+
+def occurs(var, exp):
+    if isinstance(exp, VarExp):
+        return var.name == exp.name
+    elif isinstance(exp, OpExp):
+        for i in exp.args:
+            if occurs(var, i):
+                return True
+    return False
+
+def degree(exp):
+    if isinstance(exp, ConstExp):
+        return 0
+    elif isinstance(exp, VarExp):
+        return 1
+    else:
+        return 2
+    # degree is determined by this formula: deg(e) = 0 if e is a ConstExp, 1 if e is a VarExp, sum(deg(a[i]) for i in e.args) if e is a * OpExp, 
+
+def convert_to_sum(exp):
+    def issummate(e):
+        return isinstance(e, OpExp) and e.op == ops.summate
+    if isinstance(exp, OpExp):
+        if exp.op == ops.add:
+            arglist = []
+            a1 = convert_to_sum(exp.args[0])
+            a2 = convert_to_sum(exp.args[1])
+            if issummate(a1):
+                arglist.extend(a1.args)
+            else:
+                arglist.append(a1)
+            if issummate(a2):
+                arglist.extend(a2.args)
+            else:
+                arglist.append(a2)
+            return OpExp(ops.summate, *arglist)
+    else:
+        return exp
+
+def sort_sum(exp):
+    if not (isinstance(exp, OpExp) and exp.op == ops.summate):
+        return exp
+    exp.args.sort(key=degree, reverse=True)
+    return exp
+
+def convert_to_mult(exp):
+    def ismultiply(e):
+        return isinstance(e, OpExp) and e.op == ops.multiply
+    if isinstance(exp, OpExp):
+        if exp.op == ops.mul:
+            arglist = []
+            a1 = convert_to_mult(exp.args[0])
+            a2 = convert_to_mult(exp.args[1])
+            if ismultiply(a1):
+                arglist.extend(a1.args)
+            else:
+                arglist.append(a1)
+            if ismultiply(a2):
+                arglist.extend(a2.args)
+            else:
+                arglist.append(a2)
+            return OpExp(ops.multiply, *arglist)
+    else:
+        return exp
+
+def rebalance(exp):
+    pass
+    # this method should rebalance an expression's tree so that associative operations are reordered to be evaluated as if left-associative
+    # actually, it will just put them into an ops.summate or ops.multiply
+    # this method should also reorder commutative operations so that the operations occur in a particular order:
+    #   + should order by degree then alphabet. degree is determined by the degree function
+    #   * should order by alphabet, with constants first
 
 def match_formula(exp, formula):
     if isinstance(formula, ConstExp):
